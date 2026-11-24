@@ -1,4 +1,5 @@
 import streamlit as st
+import io
 import pandas as pd
 import plotly.express as px
 from src.preprocessing import load_and_prepare, make_demo_data
@@ -27,7 +28,10 @@ try:
         data_label = "Uploaded dataset"
     else:
         raw = make_demo_data()
-        _, X, y, reading_count = load_and_prepare(raw, "FLAG", [])
+        # Pass a CSV buffer here so this path also works with older cached
+        # preprocessing modules that expect a file-like object.
+        demo_csv = io.StringIO(raw.to_csv(index=False))
+        _, X, y, reading_count = load_and_prepare(demo_csv, "FLAG", [])
         data_label = "Synthetic demonstration dataset"
     with st.spinner("Training models..."):
         result = train_and_evaluate(X, y, alpha=float(alpha), seed=int(seed))
