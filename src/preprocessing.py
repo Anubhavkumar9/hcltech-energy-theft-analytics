@@ -4,7 +4,8 @@ import numpy as np
 
 def load_and_prepare(uploaded_file, target_col="FLAG", id_cols=None):
     """Load a labelled CSV and create consumer-level summary features."""
-    df = pd.read_csv(uploaded_file)
+    # Accept either an uploaded CSV file or an already-created DataFrame.
+    df = uploaded_file.copy() if isinstance(uploaded_file, pd.DataFrame) else pd.read_csv(uploaded_file)
     if df.empty:
         raise ValueError("The uploaded CSV is empty.")
     id_cols = id_cols or []
