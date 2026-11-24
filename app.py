@@ -28,19 +28,20 @@ try:
         data_label = "Uploaded dataset"
     else:
         raw = make_demo_data()
-        # Pass a CSV buffer here so this path also works with older cached
-        # preprocessing modules that expect a file-like object.
         demo_csv = io.StringIO(raw.to_csv(index=False))
         _, X, y, reading_count = load_and_prepare(demo_csv, "FLAG", [])
         data_label = "Synthetic demonstration dataset"
+
     with st.spinner("Training models..."):
         result = train_and_evaluate(X, y, alpha=float(alpha), seed=int(seed))
+
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Records", f"{len(X):,}")
     c2.metric("Flagged labels", f"{int(y.sum()):,}")
     c3.metric("Positive-label rate", f"{y.mean()*100:.1f}%")
     c4.metric("Reading columns", reading_count)
     st.warning(f"Data source: {data_label}. Synthetic results are illustrative only.")
+
     st.subheader("Model comparison")
     metrics = pd.DataFrame(result["metrics"])
     st.dataframe(metrics.style.format({c: "{:.3f}" for c in metrics.columns if c != "Model"}),
@@ -48,6 +49,7 @@ try:
     fig = px.bar(metrics.melt(id_vars="Model", value_vars=["Precision", "Recall", "F1", "PR-AUC", "ROC-AUC"]),
         x="Model", y="value", color="variable", barmode="group", title="Held-out test metrics")
     st.plotly_chart(fig, use_container_width=True)
+
     st.subheader("Investigation priority (test partition)")
     ranked = pd.DataFrame({"Hybrid risk score": result["hybrid_scores"],
         "Anomaly score": result["anomaly_scores"],
@@ -56,9 +58,22 @@ try:
     st.dataframe(ranked.head(50), use_container_width=True)
     st.download_button("Download ranked review candidates",
         ranked.to_csv(index=True).encode("utf-8"), "ranked_review_candidates.csv", "text/csv")
+
     st.subheader("Hybrid confusion matrix (threshold 0.50)")
-    st.dataframe(pd.DataFrame(result["confusion"],
-        index=["Actual 0", "Actual 1"], columns=["Predicted 0", "Predicted 1"]))
+    cm = result["confusion"]
+    tn, fp, fn, tp = cm.ravel()
+    matrix_display = pd.DataFrame(
+        cm,
+        index=pd.Index(["Actual: Normal (0)", "Actual: Flagged (1)"], name="Actual class"),
+        columns=pd.Index(["Predicted: Normal (0)", "Predicted: Flagged (1)"], name="Predicted class")
+    )
+    st.table(matrix_display)
+    st.caption("Rows are actual classes; columns are predicted classes. The counts below come from this same matrix.")
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("True negatives (TN)", int(tn))
+    m2.metric("False positives (FP)", int(fp))
+    m3.metric("False negatives (FN)", int(fn))
+    m4.metric("True positives (TP)", int(tp))
     st.caption("For research-grade results, use chronological/customer-grouped validation, tune thresholds on validation data, and test independently. A model flag requires human review.")
 except Exception as e:
     st.error(f"Could not process the data: {e}")
